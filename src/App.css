@@ -37,8 +37,8 @@
 .pitch-container {
   position: relative;
   width: 100%;
-  /* Preserve true pitch proportions: half-length (52.5m) x width (68m) */
-  aspect-ratio: 525 / 680;
+  /* Preserve true pitch proportions: width (68m) x half-length (52.5m) after 90° CCW rotation */
+  aspect-ratio: 680 / 525;
   border-radius: 1.1rem;
   overflow: hidden;
   box-shadow:

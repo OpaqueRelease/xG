@@ -320,8 +320,11 @@ function mapPitchToCanvas(
   width: number,
   height: number,
 ): { px: number; py: number } {
-  const px = (x / PITCH_LENGTH) * width
-  const py = height / 2 + (y / PITCH_WIDTH) * height
+  // Rotate pitch 90 degrees counter-clockwise for display:
+  // - Horizontal screen axis corresponds to pitch width (y)
+  // - Vertical screen axis corresponds to pitch length (x), with goal at the bottom
+  const px = width / 2 + (y / PITCH_WIDTH) * width
+  const py = height - (x / PITCH_LENGTH) * height
   return { px, py }
 }
 
@@ -331,8 +334,8 @@ function mapCanvasToPitch(
   width: number,
   height: number,
 ): { x: number; y: number } {
-  const x = (px / width) * PITCH_LENGTH
-  const y = ((py - height / 2) / height) * PITCH_WIDTH
+  const y = ((px - width / 2) / width) * PITCH_WIDTH
+  const x = ((height - py) / height) * PITCH_LENGTH
   return { x, y }
 }
 
@@ -426,30 +429,38 @@ function App() {
     ctx.lineTo(goalBottom.px, goalBottom.py)
     ctx.stroke()
 
-    // Penalty area (16.5m) and box (5.5m)
+    // Penalty area (16.5m deep, 40.32m wide) and goal area (5.5m deep, 18.32m wide)
     const penaltyDepth = 16.5
-    const sixYard = 5.5
+    const penaltyHalfWidth = 40.32 / 2
+    const sixYardDepth = 5.5
+    const sixYardHalfWidth = 18.32 / 2
 
-    const topPA = mapPitchToCanvas(0, -PITCH_WIDTH / 2 + 16.5, w, h)
-    const bottomPA = mapPitchToCanvas(0, PITCH_WIDTH / 2 - 16.5, w, h)
-    const paRight = mapPitchToCanvas(penaltyDepth, 0, w, h)
+    // Penalty area rectangle (x from 0 to 16.5, y from -20.16 to +20.16)
+    const paTopGoal = mapPitchToCanvas(0, -penaltyHalfWidth, w, h)
+    const paBottomGoal = mapPitchToCanvas(0, penaltyHalfWidth, w, h)
+    const paTopDepth = mapPitchToCanvas(penaltyDepth, -penaltyHalfWidth, w, h)
+    const paBottomDepth = mapPitchToCanvas(penaltyDepth, penaltyHalfWidth, w, h)
 
     ctx.beginPath()
-    ctx.moveTo(topPA.px, topPA.py)
-    ctx.lineTo(paRight.px, topPA.py)
-    ctx.lineTo(paRight.px, bottomPA.py)
-    ctx.lineTo(bottomPA.px, bottomPA.py)
+    ctx.moveTo(paTopGoal.px, paTopGoal.py)
+    ctx.lineTo(paTopDepth.px, paTopDepth.py)
+    ctx.lineTo(paBottomDepth.px, paBottomDepth.py)
+    ctx.lineTo(paBottomGoal.px, paBottomGoal.py)
+    ctx.closePath()
     ctx.stroke()
 
-    const top6 = mapPitchToCanvas(0, -sixYard, w, h)
-    const bottom6 = mapPitchToCanvas(0, sixYard, w, h)
-    const sixRight = mapPitchToCanvas(5.5, 0, w, h)
+    // Six-yard box rectangle (x from 0 to 5.5, y from -9.16 to +9.16)
+    const sixTopGoal = mapPitchToCanvas(0, -sixYardHalfWidth, w, h)
+    const sixBottomGoal = mapPitchToCanvas(0, sixYardHalfWidth, w, h)
+    const sixTopDepth = mapPitchToCanvas(sixYardDepth, -sixYardHalfWidth, w, h)
+    const sixBottomDepth = mapPitchToCanvas(sixYardDepth, sixYardHalfWidth, w, h)
 
     ctx.beginPath()
-    ctx.moveTo(top6.px, top6.py)
-    ctx.lineTo(sixRight.px, top6.py)
-    ctx.lineTo(sixRight.px, bottom6.py)
-    ctx.lineTo(bottom6.px, bottom6.py)
+    ctx.moveTo(sixTopGoal.px, sixTopGoal.py)
+    ctx.lineTo(sixTopDepth.px, sixTopDepth.py)
+    ctx.lineTo(sixBottomDepth.px, sixBottomDepth.py)
+    ctx.lineTo(sixBottomGoal.px, sixBottomGoal.py)
+    ctx.closePath()
     ctx.stroke()
 
     // Penalty spot (11m)
