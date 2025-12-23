@@ -145,6 +145,39 @@
   color: #9ca3af;
 }
 
+.shot-type {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: #a5b4fc;
+}
+
+.shot-type-label {
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.shot-toggles {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: #e5e7eb;
+}
+
+.shot-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.shot-toggles input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: #38bdf8;
+}
+
 .muted {
   margin: 0.1rem 0 0;
   font-size: 0.9rem;

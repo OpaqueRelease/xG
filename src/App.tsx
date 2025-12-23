@@ -15,6 +15,13 @@ type OpenGoalResult = {
   idealTargetY: number | null
 }
 
+type XGComponents = {
+  baseLoc: number
+  F_open: number
+  F_def: number
+  F_gk: number
+}
+
 // Pitch & goal dimensions (in meters)
 const PITCH_LENGTH = 52.5 // half pitch, standard 105m total
 const PITCH_WIDTH = 68
@@ -26,6 +33,7 @@ const BETA_OPEN = 1.2
 const MIN_OPEN_FACTOR = 0.15 // residual visibility even when goal appears fully blocked
 const A_DEF_BETWEEN = 0.4
 const B_PRESSURE = 0.8
+const MIN_HEADER_FACTOR = 0.05 // residual headed chance even when far / very hard
 
 const DEFENDER_RADIUS = 0.6 // effective blocking radius (m)
 const GK_RADIUS = 0.8
@@ -260,13 +268,18 @@ function computeGKCoverage(
   return cPos * cAlign
 }
 
-function computeXG(shotX: number, shotY: number, players: Player[]): number {
-  if (shotX <= 0) return 0
+// Core xG components shared by all shot types (open play, cross, header, etc.)
+function computeXGComponents(
+  shotX: number,
+  shotY: number,
+  players: Player[],
+): XGComponents | null {
+  if (shotX <= 0) return null
 
   const d = distance(shotX, shotY, 0, 0)
   const alpha = computeAngleToPosts(shotX, shotY)
 
-  if (!Number.isFinite(d) || d <= 0) return 0
+  if (!Number.isFinite(d) || d <= 0) return null
 
   const baseLoc = computeBaseLocationTerm(d, alpha)
 
@@ -290,6 +303,57 @@ function computeXG(shotX: number, shotY: number, players: Player[]): number {
 
   const C_gk = computeGKCoverage(shotX, shotY, players, openGoal.idealTargetY)
   const F_gk = 0.4 + 0.8 * (1 - C_gk)
+
+  return { baseLoc, F_open, F_def, F_gk }
+}
+
+// Main model entry point: choose between open-play, cross, and cross-header variants
+function computeXG(
+  shotX: number,
+  shotY: number,
+  players: Player[],
+  opts: { isCross: boolean; isHeader: boolean },
+): number {
+  const core = computeXGComponents(shotX, shotY, players)
+  if (!core) return 0
+
+  let { baseLoc, F_open, F_def, F_gk } = core
+
+  // Open-play (default) model uses the core components directly.
+  // Cross / header variants re-weight the base location term to reflect
+  // mechanical difficulty of the shot type.
+  const d = distance(shotX, shotY, 0, 0)
+
+  // Difficulty from finishing a cross (with foot), relative to a fully controlled shot.
+  let crossFactor = 1
+  if (opts.isCross) {
+    if (d < 8) {
+      crossFactor = 0.85
+    } else if (d < 16.5) {
+      crossFactor = 0.8
+    } else if (d < 25) {
+      crossFactor = 0.7
+    } else {
+      crossFactor = 0.6
+    }
+  }
+
+  // Additional difficulty for headers: close-range headers are still reasonably dangerous,
+  // but difficulty rises quickly with distance and approaches ~0 around 16m.
+  let headerFactor = 1
+  if (opts.isHeader) {
+    if (d <= 8) {
+      headerFactor = 0.7
+    } else if (d <= 16) {
+      const t = (d - 8) / 8 // 0 at 8m, 1 at 16m
+      const falloff = 0.7 * (1 - t * t)
+      headerFactor = Math.max(MIN_HEADER_FACTOR, falloff)
+    } else {
+      headerFactor = MIN_HEADER_FACTOR
+    }
+  }
+
+  baseLoc *= crossFactor * headerFactor
 
   let xg = baseLoc * F_open * F_def * F_gk
   if (!Number.isFinite(xg)) xg = 0
@@ -359,6 +423,9 @@ function App() {
     null,
   )
 
+  const [isCross, setIsCross] = useState(false)
+  const [isHeader, setIsHeader] = useState(false)
+
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const pitchRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -410,7 +477,10 @@ function App() {
         if (x < 0 || x > PITCH_LENGTH) continue
         if (Math.abs(y) > PITCH_WIDTH / 2) continue
 
-        const xg = computeXG(x, y, playersMemo)
+        const xg = computeXG(x, y, playersMemo, {
+          isCross,
+          isHeader,
+        })
         if (xg <= 0) continue
 
         ctx.fillStyle = xgToColor(xg)
@@ -474,7 +544,7 @@ function App() {
     ctx.arc(penSpot.px, penSpot.py, 3, 0, Math.PI * 2)
     ctx.fillStyle = 'rgba(255,255,255,0.9)'
     ctx.fill()
-  }, [playersMemo])
+  }, [playersMemo, isCross, isHeader])
 
   const handlePitchMouseMove: React.MouseEventHandler<HTMLDivElement> = (e) => {
     const pitchEl = pitchRef.current
@@ -498,7 +568,10 @@ function App() {
       return
     }
 
-    const xg = computeXG(x, y, players)
+    const xg = computeXG(x, y, players, {
+      isCross,
+      isHeader,
+    })
     setHoverXG(xg)
     setHoverPos({ x, y })
 
@@ -592,12 +665,41 @@ function App() {
                     {hoverPos.y.toFixed(1)} m
                   </span>
                 </div>
+                <div className="shot-type">
+                  <span className="shot-type-label">Shot context:</span>{' '}
+                  {isCross ? (isHeader ? 'Cross → Header' : 'Cross → Shot') : 'Open play'}
+                </div>
               </>
             ) : (
               <p className="muted">
                 Move your mouse over the pitch to inspect shot xG.
               </p>
             )}
+            <div className="shot-toggles">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={isCross}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                    setIsCross(next)
+                    if (!next) {
+                      setIsHeader(false)
+                    }
+                  }}
+                />{' '}
+                Cross
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={isHeader}
+                  disabled={!isCross}
+                  onChange={(e) => setIsHeader(e.target.checked)}
+                />{' '}
+                Header
+              </label>
+            </div>
           </div>
 
           <div className="card">
