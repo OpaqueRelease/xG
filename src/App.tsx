@@ -389,9 +389,10 @@ function App() {
     ctx.fillStyle = '#0b5d2a'
     ctx.fillRect(0, 0, w, h)
 
-    // xG heatmap (coarse grid)
-    const cellsX = 70
-    const cellsY = 40
+    // xG heatmap grid (very high resolution, adapts to canvas size)
+    const targetCellSize = 6 // pixels
+    const cellsX = Math.max(60, Math.floor(w / targetCellSize))
+    const cellsY = Math.max(36, Math.floor(h / targetCellSize))
     const cellWidth = w / cellsX
     const cellHeight = h / cellsY
 
