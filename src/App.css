@@ -79,6 +79,13 @@
     background 120ms ease-out;
 }
 
+.player-marker:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow:
+    0 0 0 3px rgba(56, 189, 248, 0.9),
+    0 10px 26px rgba(15, 23, 42, 0.9);
+}
+
 .player-marker:active {
   cursor: grabbing;
   transform: translateY(-1px) scale(1.02);
