@@ -512,6 +512,25 @@ function App() {
     ctx.lineTo(goalBottom.px, goalBottom.py)
     ctx.stroke()
 
+    // Goal frame (simple 2D rectangle extending 1m into the pitch)
+    const goalDepth = 1
+    const goalTopIn = mapPitchToCanvas(goalDepth, -GOAL_WIDTH / 2, w, h)
+    const goalBottomIn = mapPitchToCanvas(goalDepth, GOAL_WIDTH / 2, w, h)
+
+    ctx.save()
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    // Left post
+    ctx.moveTo(goalTop.px, goalTop.py)
+    ctx.lineTo(goalTopIn.px, goalTopIn.py)
+    // Crossbar
+    ctx.lineTo(goalBottomIn.px, goalBottomIn.py)
+    // Right post
+    ctx.lineTo(goalBottom.px, goalBottom.py)
+    ctx.stroke()
+    ctx.restore()
+
     // Penalty area (16.5m deep, 40.32m wide) and goal area (5.5m deep, 18.32m wide)
     const penaltyDepth = 16.5
     const penaltyHalfWidth = 40.32 / 2
