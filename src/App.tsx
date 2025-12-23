@@ -22,6 +22,11 @@ type XGComponents = {
   F_gk: number
 }
 
+type PitchSize = {
+  width: number
+  height: number
+}
+
 // Pitch & goal dimensions (in meters)
 const PITCH_LENGTH = 52.5 // half pitch, standard 105m total
 const PITCH_WIDTH = 68
@@ -437,20 +442,36 @@ function App() {
   const [draggingId, setDraggingId] = useState<number | null>(null)
   const pitchRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [pitchSize, setPitchSize] = useState<PitchSize>({ width: 1, height: 1 })
 
   const playersMemo = useMemo(() => players, [players])
+
+  // Measure pitch container size on mount and when window resizes
+  useEffect(() => {
+    const updateSize = () => {
+      const el = pitchRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        setPitchSize({ width: rect.width, height: rect.height })
+      }
+    }
+
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    return () => {
+      window.removeEventListener('resize', updateSize)
+    }
+  }, [])
 
   // Draw heatmap and pitch markings
   useEffect(() => {
     const canvas = canvasRef.current
-    const container = pitchRef.current
-    if (!canvas || !container) return
+    if (!canvas) return
 
-    const rect = container.getBoundingClientRect()
-
-    // Keep the internal canvas resolution in sync with the displayed size
-    const displayWidth = Math.max(1, Math.floor(rect.width))
-    const displayHeight = Math.max(1, Math.floor(rect.height))
+    // Keep the internal canvas resolution in sync with the measured pitch size
+    const displayWidth = Math.max(1, Math.floor(pitchSize.width))
+    const displayHeight = Math.max(1, Math.floor(pitchSize.height))
     if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
       canvas.width = displayWidth
       canvas.height = displayHeight
@@ -571,7 +592,7 @@ function App() {
     ctx.arc(penSpot.px, penSpot.py, 3, 0, Math.PI * 2)
     ctx.fillStyle = 'rgba(255,255,255,0.9)'
     ctx.fill()
-  }, [playersMemo, isCross, isHeader])
+  }, [playersMemo, isCross, isHeader, pitchSize])
 
   const handlePitchMouseMove: React.MouseEventHandler<HTMLDivElement> = (e) => {
     const pitchEl = pitchRef.current
@@ -652,10 +673,12 @@ function App() {
             />
 
             {players.map((p) => {
-              const rect = pitchRef.current?.getBoundingClientRect()
-              const width = rect?.width ?? 1
-              const height = rect?.height ?? 1
-              const { px, py } = mapPitchToCanvas(p.x, p.y, width, height)
+              const { px, py } = mapPitchToCanvas(
+                p.x,
+                p.y,
+                pitchSize.width,
+                pitchSize.height,
+              )
 
               return (
                 <button
