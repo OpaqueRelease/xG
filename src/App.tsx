@@ -23,6 +23,7 @@ const GOAL_WIDTH = 7.32
 // Model tuning constants (from our "common sense" calibration)
 const K_DISTANCE = 35
 const BETA_OPEN = 1.2
+const MIN_OPEN_FACTOR = 0.15 // residual visibility even when goal appears fully blocked
 const A_DEF_BETWEEN = 0.4
 const B_PRESSURE = 0.8
 
@@ -272,7 +273,10 @@ function computeXG(shotX: number, shotY: number, players: Player[]): number {
   const openGoal = computeOpenGoal(shotX, shotY, players)
   const fOpen = openGoal.fractionOpen
 
-  const F_open = fOpen <= 0 ? 0 : Math.pow(fOpen, BETA_OPEN)
+  // Even if fractionOpen is computed as 0, shots can still go over/around defenders.
+  // We therefore never reduce xG all the way to 0 purely from blocking.
+  const F_openBase = fOpen <= 0 ? 0 : Math.pow(fOpen, BETA_OPEN)
+  const F_open = F_openBase * (1 - MIN_OPEN_FACTOR) + MIN_OPEN_FACTOR
 
   const { nBetween, minDefenderDist } = computeDefenderMetrics(
     shotX,
