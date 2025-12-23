@@ -27,10 +27,16 @@ const PITCH_LENGTH = 52.5 // half pitch, standard 105m total
 const PITCH_WIDTH = 68
 const GOAL_WIDTH = 7.32
 
-// Model tuning constants (from our "common sense" calibration)
-const K_DISTANCE = 35
+// Model tuning constants (hand-tuned calibration)
+// K_DISTANCE controls base xG vs distance. Larger values increase close-range xG.
+const K_DISTANCE = 32
 const BETA_OPEN = 1.2
-const MIN_OPEN_FACTOR = 0.15 // residual visibility even when goal appears fully blocked
+// Even when the goal rays look fully blocked, there is still a tiny chance
+// to score by shooting over/around defenders.
+const MIN_OPEN_FACTOR = 0.05
+// Global scale applied to all shot types (open play, crosses, headers).
+// Keep at 1 for now; overall xG saturation is handled by the final logistic.
+const GLOBAL_XG_SCALE = 1
 const A_DEF_BETWEEN = 0.4
 const B_PRESSURE = 0.8
 const MIN_HEADER_FACTOR = 0.05 // residual headed chance even when far / very hard
@@ -57,7 +63,7 @@ function computeAngleToPosts(shotX: number, shotY: number): number {
 function computeBaseLocationTerm(d: number, alpha: number): number {
   const safeD = Math.max(d, 0.5)
 
-  const baseCentral = Math.min(0.95, K_DISTANCE / (safeD * safeD))
+  const baseCentral = K_DISTANCE / (safeD * safeD)
 
   const alphaCentral = 2 * Math.atan((GOAL_WIDTH / 2) / safeD)
   const effectiveAlpha = Math.min(alpha, alphaCentral)
@@ -355,10 +361,12 @@ function computeXG(
 
   baseLoc *= crossFactor * headerFactor
 
-  let xg = baseLoc * F_open * F_def * F_gk
-  if (!Number.isFinite(xg)) xg = 0
+  let raw = baseLoc * F_open * F_def * F_gk * GLOBAL_XG_SCALE
+  if (!Number.isFinite(raw) || raw <= 0) return 0
 
-  xg = Math.max(0, Math.min(0.95, xg))
+  // Convert raw scoring "intensity" into probability with a smooth saturation.
+  // This avoids an arbitrary hard cap (like 0.95) while keeping values < 1.
+  const xg = raw / (1 + raw)
   return xg
 }
 
